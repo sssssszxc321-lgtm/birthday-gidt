@@ -7,6 +7,7 @@ export default async function handler(req, res) {
     }
 
     try {
+
         const { url } = req.body || {};
 
         if (!url) {
@@ -17,46 +18,52 @@ export default async function handler(req, res) {
 
         const apiUrl =
             "https://is.gd/create.php" +
-            "?format=json" +
+            "?format=simple" +
             "&url=" +
             encodeURIComponent(url);
 
         const response = await fetch(apiUrl);
 
-        // Сначала получаем обычный текст.
-        const text = await response.text();
+        const text =
+            (await response.text()).trim();
 
-        // Пытаемся превратить его в JSON.
-        let data = null;
+        console.log(
+            "is.gd response:",
+            response.status,
+            text
+        );
 
-        try {
-            data = JSON.parse(text);
-        } catch {
-            return res.status(502).json({
-                error: "is.gd вернул не JSON",
-                details: text.slice(0, 500)
+        // Успешный ответ is.gd выглядит примерно так:
+        // https://is.gd/AbCd12
+
+        if (
+            response.ok &&
+            text.startsWith("https://is.gd/")
+        ) {
+
+            return res.status(200).json({
+                shorturl: text
             });
+
         }
 
-        if (!response.ok || !data.shorturl) {
-            return res.status(502).json({
-                error:
-                    data.errormessage ||
-                    "is.gd не смог сократить ссылку",
-                errorcode: data.errorcode || null
-            });
-        }
-
-        return res.status(200).json({
-            shorturl: data.shorturl
+        // Если is.gd вернул ошибку,
+        // показываем её настоящую причину.
+        return res.status(502).json({
+            error:
+                text ||
+                "is.gd не вернул ссылку"
         });
 
     } catch (error) {
+
         console.error(error);
 
         return res.status(500).json({
-            error: "Ошибка сервера при сокращении ссылки",
-            details: error.message
+            error:
+                "Ошибка сервера при сокращении ссылки",
+            details:
+                error.message
         });
     }
 }
