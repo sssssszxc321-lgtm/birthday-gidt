@@ -1,6 +1,5 @@
 export default async function handler(req, res) {
 
-    /* Разрешаем только POST. */
     if (req.method !== "POST") {
         return res.status(405).json({
             error: "Method not allowed"
@@ -8,17 +7,14 @@ export default async function handler(req, res) {
     }
 
     try {
-        /* Получаем URL от create.html. */
-        const { url } = req.body;
+        const { url } = req.body || {};
 
-        /* Проверяем URL. */
         if (!url) {
             return res.status(400).json({
                 error: "URL отсутствует"
             });
         }
 
-        /* Отправляем запрос в is.gd. */
         const apiUrl =
             "https://is.gd/create.php" +
             "?format=json" +
@@ -26,27 +22,41 @@ export default async function handler(req, res) {
             encodeURIComponent(url);
 
         const response = await fetch(apiUrl);
-        const data = await response.json();
 
-        /* Если is.gd вернул ошибку. */
-        if (!response.ok || !data.shorturl) {
-            return res.status(500).json({
-                error:
-                    data.errormessage ||
-                    "is.gd не смог сократить ссылку"
+        // Сначала получаем обычный текст.
+        const text = await response.text();
+
+        // Пытаемся превратить его в JSON.
+        let data = null;
+
+        try {
+            data = JSON.parse(text);
+        } catch {
+            return res.status(502).json({
+                error: "is.gd вернул не JSON",
+                details: text.slice(0, 500)
             });
         }
 
-        /* Возвращаем короткую ссылку обратно браузеру. */
+        if (!response.ok || !data.shorturl) {
+            return res.status(502).json({
+                error:
+                    data.errormessage ||
+                    "is.gd не смог сократить ссылку",
+                errorcode: data.errorcode || null
+            });
+        }
+
         return res.status(200).json({
             shorturl: data.shorturl
         });
 
     } catch (error) {
         console.error(error);
+
         return res.status(500).json({
-            error:
-                "Ошибка сервера при сокращении ссылки"
+            error: "Ошибка сервера при сокращении ссылки",
+            details: error.message
         });
     }
 }
