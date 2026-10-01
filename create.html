@@ -254,8 +254,16 @@ photosInput.addEventListener(
                     );
 
 
+                /*
+                 * Загружаем сжатую фотографию в Vercel Blob.
+                 * В selectedPhotos сохраняем уже короткий URL,
+                 * а не огромный Base64.
+                 */
+                const imageUrl =
+                    await uploadPhoto(image, file.name);
+
                 selectedPhotos.push(
-                    image
+                    imageUrl
                 );
 
 
@@ -288,6 +296,91 @@ photosInput.addEventListener(
     }
 );
 
+
+
+/*
+ * Загружаем сжатую фотографию в Vercel Blob.
+ */
+
+async function uploadPhoto(
+    dataUrl,
+    originalName
+) {
+
+    const parts =
+        dataUrl.split(",");
+
+    const mimeMatch =
+        parts[0].match(/:(.*?);/);
+
+    const mimeType =
+        mimeMatch
+            ? mimeMatch[1]
+            : "image/jpeg";
+
+    const binary =
+        atob(parts[1]);
+
+    const bytes =
+        new Uint8Array(
+            binary.length
+        );
+
+    for (
+        let i = 0;
+        i < binary.length;
+        i++
+    ) {
+        bytes[i] =
+            binary.charCodeAt(i);
+    }
+
+    const blob =
+        new Blob(
+            [bytes],
+            { type: mimeType }
+        );
+
+    const filename =
+        "birthday-photo-" +
+        Date.now() +
+        "-" +
+        Math.random()
+            .toString(36)
+            .slice(2) +
+        ".jpg";
+
+    const response =
+        await fetch(
+            "/api/upload?filename=" +
+            encodeURIComponent(
+                filename
+            ),
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type":
+                        mimeType
+                },
+                body: blob
+            }
+        );
+
+    const data =
+        await response.json();
+
+    if (
+        !response.ok ||
+        !data.url
+    ) {
+        throw new Error(
+            data.error ||
+            "Не удалось загрузить фотографию"
+        );
+    }
+
+    return data.url;
+}
 
 
 /*
@@ -477,7 +570,9 @@ createButton.addEventListener(
 
 
         createButton.textContent =
-            "Создаём подарок...";
+            selectedPhotos.length
+                ? "Загружаем фотографии..."
+                : "Создаём подарок...";
 
 
         try {
