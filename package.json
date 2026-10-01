@@ -1,0 +1,8 @@
+{
+  "name": "birthday-gidt",
+  "private": true,
+  "version": "1.0.0",
+  "dependencies": {
+    "@vercel/blob": "latest"
+  }
+}
